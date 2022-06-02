@@ -1,5 +1,5 @@
 /*
- * Copyright (c) "Neo4j"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -17,84 +17,117 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { BaseType } from 'd3-selection'
-
-import { NodeCaptionLine, NodeModel } from '../../../../models/Node'
-import { RelationshipModel } from '../../../../models/Relationship'
-import Renderer from '../Renderer'
-
-const noop = () => undefined
+import Renderer from '../components/renderer'
+const noop = function () {}
 
 const nodeRingStrokeSize = 8
 
-const nodeOutline = new Renderer<NodeModel>({
-  name: 'nodeOutline',
-  onGraphChange(selection, viz) {
-    return selection
-      .selectAll('circle.b-outline')
-      .data(node => [node])
-      .join('circle')
-      .classed('b-outline', true)
-      .attr('cx', 0)
-      .attr('cy', 0)
-      .attr('r', (node: NodeModel) => {
-        return node.radius
-      })
-      .attr('fill', (node: NodeModel) => {
-        return viz.style.forNode(node).get('color')
-      })
-      .attr('stroke', (node: NodeModel) => {
-        return viz.style.forNode(node).get('border-color')
-      })
-      .attr('stroke-width', (node: NodeModel) => {
-        return viz.style.forNode(node).get('border-width')
-      })
-  },
-  onTick: noop
-})
-
-const nodeCaption = new Renderer<NodeModel>({
-  name: 'nodeCaption',
-  onGraphChange(selection, viz) {
-    return (
-      selection
-        .selectAll('text.caption')
-        .data((node: NodeModel) => node.caption)
-        .join('text')
-        // Classed element ensures duplicated data will be removed before adding
-        .classed('caption', true)
-        .attr('text-anchor', 'middle')
-        .attr('pointer-events', 'none')
-        .attr('x', 0)
-        .attr('y', (line: NodeCaptionLine) => line.baseline)
-        .attr('font-size', (line: NodeCaptionLine) =>
-          viz.style.forNode(line.node).get('font-size')
-        )
-        .attr('fill', (line: NodeCaptionLine) =>
-          viz.style.forNode(line.node).get('text-color-internal')
-        )
-        .text((line: NodeCaptionLine) => line.text)
-    )
-  },
-
-  onTick: noop
-})
-
-const nodeRing = new Renderer<NodeModel>({
-  name: 'nodeRing',
-  onGraphChange(selection) {
-    const circles = selection
-      .selectAll('circle.ring')
-      .data((node: NodeModel) => [node])
+const nodeOutline = new Renderer({
+  onGraphChange (selection, viz) {
+    const circles = selection.selectAll('circle.outline').data(node => [node])
 
     circles
       .enter()
-      .insert('circle', '.b-outline')
+      .append('circle')
+      .classed('outline', true)
+      .attr({
+        cx: 0,
+        cy: 0
+      })
+
+    circles.attr({
+      r (node) {
+        return node.radius
+      },
+      fill (node) {
+        return viz.style.forNode(node).get('color')
+      },
+      stroke (node) {
+        return viz.style.forNode(node).get('border-color')
+      },
+      'stroke-width' (node) {
+        return viz.style.forNode(node).get('border-width')
+      }
+    })
+
+    return circles.exit().remove()
+  },
+  onTick: noop
+})
+
+const nodeCaption = new Renderer({
+  onGraphChange (selection, viz) {
+    const text = selection.selectAll('text.caption').data(node => node.caption)
+
+    text
+      .enter()
+      .append('text')
+      // .classed('caption', true)
+      .attr({ 'text-anchor': 'middle' })
+      .attr({ 'pointer-events': 'none' })
+
+    text
+      .text(line => line.text)
+      .attr('y', line => line.baseline)
+      .attr('font-size', line => viz.style.forNode(line.node).get('font-size'))
+      .attr({
+        fill (line) {
+          return viz.style.forNode(line.node).get('text-color-internal')
+        }
+      })
+
+    return text.exit().remove()
+  },
+
+  onTick: noop
+})
+
+const nodeIcon = new Renderer({
+  onGraphChange (selection, viz) {
+    const text = selection.selectAll('text').data(node => node.caption)
+
+    text
+      .enter()
+      .append('text')
+      .attr({ 'text-anchor': 'middle' })
+      .attr({ 'pointer-events': 'none' })
+      .attr({ 'font-family': 'streamline' })
+
+    text
+      .text(line => viz.style.forNode(line.node).get('icon-code'))
+      .attr('dy', line => line.node.radius / 16)
+      .attr('font-size', line => line.node.radius)
+      .attr({
+        fill (line) {
+          return viz.style.forNode(line.node).get('text-color-internal')
+        }
+      })
+
+    return text.exit().remove()
+  },
+
+  onTick: noop
+})
+
+const nodeRing = new Renderer({
+  onGraphChange (selection) {
+    const circles = selection.selectAll('circle.ring').data(node => [node])
+
+    circles
+      .enter()
+      .insert('circle', '.outline')
       .classed('ring', true)
-      .attr('cx', 0)
-      .attr('cy', 0)
-      .attr('stroke-width', `${nodeRingStrokeSize}px`)
-      .attr('r', (node: NodeModel) => node.radius + 4)
+      .attr({
+        cx: 0,
+        cy: 0,
+        'stroke-width': nodeRingStrokeSize + 'px'
+      })
+
+    circles.attr({
+      r (node) {
+        return node.radius + 4
+      }
+    })
 
     return circles.exit().remove()
   },
@@ -102,86 +135,176 @@ const nodeRing = new Renderer<NodeModel>({
   onTick: noop
 })
 
-const arrowPath = new Renderer<RelationshipModel>({
-  name: 'arrowPath',
+const nodeImage = new Renderer({
+  onGraphChange (selection, viz) {
+    const pattern = selection.selectAll('pattern').data(function (node) {
+      if (node.propertyMap.image_url) {
+        return [node]
+      } else {
+        return []
+      }
+    })
 
-  onGraphChange(selection, viz) {
-    return selection
-      .selectAll('path.b-outline')
-      .data((rel: any) => [rel])
-      .join('path')
-      .classed('b-outline', true)
-      .attr('fill', (rel: any) => viz.style.forRelationship(rel).get('color'))
-      .attr('stroke', 'none')
+    pattern
+      .enter()
+      .append('pattern')
+      .attr({
+        id (id) {
+          return 'img-fill-' + id.id
+        },
+        patternUnits: 'userSpaceOnUse',
+        x: -39,
+        y: -39,
+        height: 156,
+        width: 156
+      })
+
+      .append('image')
+      .attr('xlink:href', link => link.propertyMap.image_url)
+      .attr({
+        x: 0,
+        y: 0,
+        type: 'image/png',
+        height: 78,
+        width: 78
+      })
+
+    return pattern.exit().remove()
   },
 
-  onTick(selection) {
+  onTick: noop
+})
+
+const nodeImageFill = new Renderer({
+  onGraphChange (selection, viz) {
+    const filledCircle = selection
+      .selectAll('circle.filled')
+      .data(node => [node])
+
+    /*! console.log(filledCircle.data()) */
+
+    filledCircle
+      .enter()
+      .append('circle')
+      .classed('filled', true)
+      .attr({
+        cx: 0,
+        cy: 0,
+        r (node) {
+          return node.radius - 1
+        },
+        fill (id) {
+          return 'url(#img-fill-' + id.id + ')'
+        }
+      })
+
+    return filledCircle.exit().remove()
+  },
+
+  onTick: noop
+})
+
+const arrowPath = new Renderer({
+  name: 'arrowPath',
+  onGraphChange (selection, viz) {
+    const paths = selection.selectAll('path.outline').data(rel => [rel])
+
+    paths
+      .enter()
+      .append('path')
+      .classed('outline', true)
+
+    paths
+      .attr('fill', rel => viz.style.forRelationship(rel).get('color'))
+      .attr('stroke', 'none')
+
+    return paths.exit().remove()
+  },
+
+  onTick (selection) {
     return selection
-      .selectAll<BaseType, RelationshipModel>('path')
-      .attr('d', d => d.arrow!.outline(d.shortCaptionLength ?? 0))
+      .selectAll('path')
+      .attr('d', d => d.arrow.outline(d.shortCaptionLength))
   }
 })
 
-const relationshipType = new Renderer<RelationshipModel>({
+const relationshipType = new Renderer({
   name: 'relationshipType',
-  onGraphChange(selection, viz) {
-    return selection
-      .selectAll('text')
-      .data(rel => [rel])
-      .join('text')
-      .attr('text-anchor', 'middle')
-      .attr('pointer-events', 'none')
+  onGraphChange (selection, viz) {
+    const texts = selection.selectAll('text').data(rel => [rel])
+
+    texts
+      .enter()
+      .append('text')
+      .attr({ 'text-anchor': 'middle' })
+      .attr({ 'pointer-events': 'none' })
+
+    texts
       .attr('font-size', rel => viz.style.forRelationship(rel).get('font-size'))
       .attr('fill', rel =>
         viz.style.forRelationship(rel).get(`text-color-${rel.captionLayout}`)
       )
+
+    return texts.exit().remove()
   },
 
-  onTick(selection, viz) {
+  onTick (selection, viz) {
     return selection
-      .selectAll<BaseType, RelationshipModel>('text')
-      .attr('x', rel => rel?.arrow?.midShaftPoint?.x ?? 0)
+      .selectAll('text')
+      .attr('x', rel => rel.arrow.midShaftPoint.x)
       .attr(
         'y',
         rel =>
-          (rel?.arrow?.midShaftPoint?.y ?? 0) +
+          rel.arrow.midShaftPoint.y +
           parseFloat(viz.style.forRelationship(rel).get('font-size')) / 2 -
           1
       )
-      .attr('transform', rel => {
+      .attr('transform', function (rel) {
         if (rel.naturalAngle < 90 || rel.naturalAngle > 270) {
-          return `rotate(180 ${rel?.arrow?.midShaftPoint?.x ?? 0} ${
-            rel?.arrow?.midShaftPoint?.y ?? 0
+          return `rotate(180 ${rel.arrow.midShaftPoint.x} ${
+            rel.arrow.midShaftPoint.y
           })`
         } else {
           return null
         }
       })
-      .text(rel => rel.shortCaption ?? '')
+      .text(rel => rel.shortCaption)
   }
 })
 
-const relationshipOverlay = new Renderer<RelationshipModel>({
+const relationshipOverlay = new Renderer({
   name: 'relationshipOverlay',
-  onGraphChange(selection) {
-    return selection
-      .selectAll('path.overlay')
-      .data(rel => [rel])
-      .join('path')
+  onGraphChange (selection) {
+    const rects = selection.selectAll('path.overlay').data(rel => [rel])
+
+    rects
+      .enter()
+      .append('path')
       .classed('overlay', true)
+
+    return rects.exit().remove()
   },
 
-  onTick(selection) {
+  onTick (selection) {
     const band = 16
 
     return selection
-      .selectAll<BaseType, RelationshipModel>('path.overlay')
-      .attr('d', d => d.arrow!.overlay(band))
+      .selectAll('path.overlay')
+      .attr('d', d => d.arrow.overlay(band))
   }
 })
 
-const node = [nodeOutline, nodeCaption, nodeRing]
+const node = []
+node.push(nodeOutline)
+node.push(nodeIcon)
+node.push(nodeRing)
+node.push(nodeImage)
+node.push(nodeImageFill)
+node.push(nodeCaption)
 
-const relationship = [arrowPath, relationshipType, relationshipOverlay]
+const relationship = []
+relationship.push(arrowPath)
+relationship.push(relationshipType)
+relationship.push(relationshipOverlay)
 
 export { node, relationship }
