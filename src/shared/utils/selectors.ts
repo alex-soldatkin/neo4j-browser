@@ -9,12 +9,9 @@ import {
 import {
   getAllowOutgoingConnections,
   getClientsAllowTelemetry,
-  getDatabases,
-  getVersion,
   isServerConfigDone,
   shouldAllowOutgoingConnections
-} from 'shared/modules/dbMeta/state'
-import { getAvailableProcedures } from 'shared/modules/features/featuresDuck'
+} from 'shared/modules/dbMeta/dbMetaDuck'
 import {
   getAllowCrashReports,
   getAllowUserStats
@@ -98,15 +95,4 @@ export const getTelemetrySettings = (state: GlobalState): TelemetrySettings => {
   }
 
   return { source, ...rules[source] }
-}
-
-export const isOnCausalCluster = (state: GlobalState): boolean => {
-  const version = semver.coerce(getVersion(state))
-  if (!version) return false
-
-  if (semver.gte(version, '4.3.0')) {
-    return getDatabases(state).some(database => database.role !== 'standalone')
-  } else {
-    return getAvailableProcedures(state).includes('dbms.cluster.overview')
-  }
 }
